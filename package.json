@@ -1,0 +1,19 @@
+{
+  "name": "scheduling-assistant",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/schedule_runner.js",
+    "summary": "node src/schedule_runner.js --once",
+    "schedule": "node src/cli.js",
+    "login": "node src/browser.js --login"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "dotenv": "^16.0.0",
+    "node-cron": "^3.0.3"
+  },
+  "devDependencies": {
+    "chrome-devtools-mcp": "latest"
+  }
+}
