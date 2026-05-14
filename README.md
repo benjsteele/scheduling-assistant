@@ -4,10 +4,76 @@ A local tool that scrapes your Outlook Web and Microsoft Teams Web, summarises n
 
 No cloud services beyond Microsoft 365 itself. Everything runs on your machine.
 
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  schedule_runner.js  (node-cron daemon / --once flag)   │
+└──────────────────────────┬──────────────────────────────┘
+                           │ triggers
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                     pipeline.js                         │
+│                                                         │
+│  browser.js ──► chrome-devtools-mcp (subprocess)        │
+│      │              Chrome (headless, profiles/browser) │
+│      │                                                  │
+│      ├─► scraper.js                                     │
+│      │     navigate_page + evaluate_script              │
+│      │     ├── outlook.office.com  → emails[]           │
+│      │     └── teams.microsoft.com → messages[]         │
+│      │                                                  │
+│      ├─► summarizer.js                                  │
+│      │     POST localhost:11434/api/chat (Ollama)       │
+│      │     └── Markdown summary string                  │
+│      │                                                  │
+│      ├─► summaries/<timestamp>.md  (written to disk)    │
+│      │                                                  │
+│      └─► notifier.js                                    │
+│            navigate_page → web.whatsapp.com             │
+│            click Send → WhatsApp message delivered      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Key design decisions:**
+- `chrome-devtools-mcp` is spawned as a child process and driven over stdio using the MCP protocol (`@modelcontextprotocol/sdk`). The app is the MCP client; it never imports `chrome-devtools-mcp` directly.
+- A single Chrome instance (one browser profile) handles all three sites per run — Outlook, Teams, and WhatsApp Web — so only one login session needs to be maintained.
+- The Ollama call is a plain `fetch` with no SDK, keeping the dependency footprint minimal.
+- `schedule.json` is the single source of truth for timing and can be updated live (via `npm run schedule`) without restarting the daemon.
+
+## Recommended specs
+
+This tool runs Chrome headless, a Node.js process, and a local LLM simultaneously.
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| RAM | 8 GB | 16 GB |
+| CPU / GPU | Any modern CPU | Apple Silicon or discrete GPU for faster LLM inference |
+| Disk | 2 GB free | 5 GB free (model weights + Chrome profile) |
+| OS | macOS 12+, Linux | macOS (Apple Silicon) |
+
+### Model recommendations (M2 MacBook Pro, 16 GB)
+
+Your unified memory is shared between the OS, Chrome, Node.js, and the model. Expect Chrome + system to use ~4–6 GB, leaving ~10 GB for the LLM.
+
+| Model | RAM usage | Speed on M2 | Quality | Verdict |
+|-------|-----------|-------------|---------|---------|
+| `llama3.2:3b` | ~2 GB | Very fast | Good for summaries | **Recommended default** |
+| `llama3.1:8b` | ~5 GB | Fast | Better reasoning | Good if you want richer summaries |
+| `mistral:7b` | ~4.5 GB | Fast | Good | Solid alternative to llama3.1:8b |
+| `phi4:14b` | ~9 GB | Slow | High quality | Pushes RAM limits when Chrome is running — not advised |
+| `llama3.1:70b` | ~40 GB | N/A | Overkill | Will not fit |
+
+**Start with `llama3.2:3b`** — it is fast enough to run a summary in under 30 seconds on an M2, and the task (summarising bullet-pointed emails) does not require a large model. Step up to `llama3.1:8b` only if summary quality feels lacking.
+
+```bash
+ollama pull llama3.2:3b   # ~2 GB download
+```
+
 ## Requirements
 
 - Node.js 20+
-- [Ollama](https://ollama.com/) running locally with at least one model pulled (e.g. `ollama pull llama3.2`)
+- [Ollama](https://ollama.com/) running locally with a model pulled (see recommendations above)
 - A Microsoft 365 account with Outlook and Teams access
 - A WhatsApp account with WhatsApp Web available
 
