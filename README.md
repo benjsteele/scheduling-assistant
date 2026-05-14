@@ -117,6 +117,39 @@ To reload a running scheduler after changing the schedule without restarting it:
 kill -HUP <pid>
 ```
 
+## Flagging priority people and channels
+
+Edit `flags.json` to mark senders or Teams channels as priority. Matching is case-insensitive substring — `"sarah"` matches `"Sarah Smith"` or `"sarah@company.com"`.
+
+```json
+{
+  "people": ["ceo@company.com", "Sarah"],
+  "channels": ["Urgent", "Engineering"]
+}
+```
+
+Flagged items appear first in the summary under a **🚩 Flagged Items** section. The LLM generates a **💬 Draft response** for each flagged message automatically. No restart needed — `flags.json` is read fresh on every run.
+
 ## Output
 
 Summaries are saved to `summaries/<ISO-timestamp>.md`. The `summaries/` directory is gitignored.
+
+A summary with flagged items looks like:
+
+```markdown
+# Summary — 14/05/2026, 09:00:00
+
+## 🚩 Flagged Items (priority people / channels)
+
+### Email: Q2 budget sign-off needed
+From: ceo@company.com (9:02 AM)
+Please review and sign off on the attached budget by EOD.
+
+💬 Draft response:
+Thanks for sending this over. I'll review the Q2 budget today and send my sign-off by end of business. Let me know if there's anything specific you'd like me to focus on.
+
+---
+
+## Other Unread Emails
+...
+```

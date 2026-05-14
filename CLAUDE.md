@@ -34,8 +34,24 @@ npm run login                                                   # first-run brow
 |------|---------|
 | `.env` | Runtime secrets — never commit. Copy from `.env.example`. |
 | `schedule.json` | `{ days: number[], hour: number, minute: number }` — days are 0–6 (0=Sun) |
+| `flags.json` | `{ people: string[], channels: string[] }` — names/addresses to prioritise |
 | `profiles/browser/` | Chrome user data dir — gitignored, created by `npm run login` |
 | `summaries/` | Output markdown files — gitignored |
+
+## Flagging and draft responses
+
+`flags.json` controls which senders and Teams channels are treated as priority. Matching is case-insensitive substring — e.g. `"sarah"` matches `"Sarah Smith"` or `"sarah@company.com"`.
+
+```json
+{
+  "people": ["ceo@company.com", "Sarah"],
+  "channels": ["Urgent", "Engineering"]
+}
+```
+
+Flagged items appear first in the summary under a **🚩 Flagged Items** section. The LLM is explicitly asked to generate a **💬 Draft response** for each one. Non-flagged items are summarised below as usual.
+
+Flagging logic lives in `src/scraper.js` (`applyFlags`). It is applied after scraping, before items are passed to `summarizer.js`. Both emails (matched on `sender`) and Teams messages (matched on `sender` and `channel`) are checked.
 
 ## Key constraints
 
@@ -43,3 +59,4 @@ npm run login                                                   # first-run brow
 - The `profiles/` directory must never be committed (contains login sessions).
 - The `.env` file must never be committed.
 - Selectors for Outlook and Teams are brittle; if scraping returns empty arrays, check them with `take_screenshot` via `chrome-devtools-mcp`.
+- Teams selectors (`TEAMS_SCRIPT` in `src/scraper.js`) attempt to capture sender and channel name but are best-effort — Microsoft changes the Teams DOM periodically.
